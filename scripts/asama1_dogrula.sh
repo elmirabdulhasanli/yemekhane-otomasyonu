@@ -14,6 +14,10 @@ calistir() {   # $1 = başlık, $2 = komut
 }
 bekle_replika() { sleep 2; }
 
+# Yeni başlamış container'lar "health: starting" görünmesin diye hepsi healthy olana kadar bekle (en çok 2 dk)
+for i in $(seq 1 60); do
+  docker compose ps --format '{{.Status}}' | grep -qE 'starting|unhealthy|Restarting' || break; sleep 2
+done
 calistir "1. Tüm servisler healthy, replica-setup Exited (0)" \
   "docker compose ps -a --format 'table {{.Service}}\t{{.Status}}'"
 calistir "1b. replica-setup günlüğü" "docker compose logs --no-log-prefix replica-setup"

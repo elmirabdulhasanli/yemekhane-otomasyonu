@@ -1,3 +1,45 @@
+# Yemekhane Otomasyonu · Dönem Ödevi (tamamlanmış)
+
+**Seçilen yol: Web API + arayüz.** `uygulama/` Node.js 22 + Express 5, yalnızca JSON döner (`/api/...`).
+`frontend/` HTML5 + CSS3 + vanilla JavaScript (`fetch`), Apache sunar. Rapor: `rapor/Yemekhane_Otomasyonu_Rapor.pdf`.
+
+```bash
+docker compose up -d          # tüm sistem (6 container), http://localhost:8080
+```
+
+| Aşama | Etiket | Ne var |
+|---|---|---|
+| 1 | `asama-1` | `scripts/asama1_dogrula.sh` → `rapor/ciktilar/asama1.txt` |
+| 2 | `asama-2` | Katmanlı API (`rotalar → controllers → servisler → veri`), 7 ekran |
+| 3 | `asama-3` | Redis menü önbelleği `menu:{yh}:{tarih}:{ogun}` + oturum `oturum:{token}` |
+| 4 | `asama-4` | `db/init/04_degisiklik.sql`, yarım porsiyon, alerjen uyarısı, `scripts/redis_menu_temizle.sh` |
+
+Ekranlar: `index.html` (giriş), `menu.html`, `haftalik.html`, `rezervasyonlar.html`, `bakiye.html`,
+`degerlendirme.html`, `yonetim.html` (yalnızca yönetici), `profil.html` (Aşama 4).
+
+### Testler
+
+```bash
+cd uygulama && npm install && npm test      # birim testleri (DB gerekmez)
+node testler/e2e.mjs                         # uçtan uca, sistem ayaktayken (Node 22)
+```
+
+### Migration'ı çalışan sisteme uygulama (Aşama 4)
+
+```bash
+docker compose exec -T mysql-primary mysql -uroot -pyemekhane_kok yemekhane < db/init/04_degisiklik.sql
+docker compose up -d --build --no-deps uygulama frontend
+bash scripts/redis_menu_temizle.sh
+```
+
+### Raporu yeniden üretme
+
+```bash
+python3 scripts/rapor_olustur.py && node scripts/rapor_pdf.js   # Playwright gerekir
+```
+
+---
+
 # Yemekhane Otomasyonu · Başlangıç Paketi
 
 Web Teknolojileri dönem ödevinin hazır altyapısı. Veritabanı şeması, örnek veri, kaynak-replika

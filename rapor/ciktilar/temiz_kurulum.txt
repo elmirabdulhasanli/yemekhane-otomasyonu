@@ -1,0 +1,22 @@
+### Sıfırdan kurulum: docker compose down -v && docker compose up -d (04_degisiklik.sql db/init içinde)
+ Volume yemekhane_mysql-primary-veri Removed 
+ Container yemekhane-replica-setup-1 Exited 
+ Container yemekhane-uygulama-1 Starting 
+ Container yemekhane-uygulama-1 Started 
+
+$ docker compose ps -a
+SERVICE         STATUS
+frontend        Up 22 seconds (healthy)
+mysql-primary   Up 23 seconds (healthy)
+mysql-replica   Up 22 seconds (healthy)
+redis           Up 22 seconds (healthy)
+replica-setup   Exited (0) 11 seconds ago
+uygulama        Up 10 seconds (healthy)
+
+$ replikada migration (porsiyon sütunu, yeni tablo, yordam parametreleri)
+porsiyon	COUNT(*)
+tam	367
+Tables_in_yemekhane (kullanici_alerjenleri)
+kullanici_alerjenleri
+sp_parametre
+3

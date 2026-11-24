@@ -40,7 +40,7 @@ calistir "3d. REPLİKADAN: güncellenmiş sp_rezervasyon_yap parametreleri ve fn
 calistir "3e. Replikasyon çalışıyor, gecikme yok" \
   "docker compose exec -T mysql-replica mysql -uroot -pyemekhane_kok -e 'SHOW REPLICA STATUS\G' | grep -E 'Replica_IO_Running|Replica_SQL_Running:|Seconds_Behind_Source|Last_SQL_Error:'"
 
-calistir "4. Yeni uygulama sürümü devreye alınır" "docker compose up -d --build 2>&1 | tail -4"
+calistir "4. Yeni uygulama sürümü devreye alınır (veritabanlarına dokunmadan)" "docker compose up -d --build --no-deps uygulama frontend 2>&1 | tail -4"
 for i in $(seq 1 60); do curl -sf -o /dev/null "$API/saglik" && break; sleep 1; done
 
 calistir "5. Redis'teki eski yapıdaki menü kayıtları temizlenir" "bash scripts/redis_menu_temizle.sh"
@@ -58,6 +58,7 @@ calistir "6d. Kaynakta kayıt ve bakiye hareketi" \
   "$PR -e \"SELECT id, menu_id, durum, porsiyon, ucret FROM rezervasyonlar WHERE kullanici_id=7 AND menu_id=$MENU; SELECT tur, tutar, aciklama FROM bakiye_hareketleri WHERE kullanici_id=7 ORDER BY id DESC LIMIT 1\""
 calistir "6e. Profilde alerjen seçimi (Süt=7, Gluten=1) ve menüde uyarı" \
   "curl -s -b $C -X PUT -H 'Content-Type: application/json' -d '{\"alerjen_idler\":[7,1]}' $API/profil/alerjenler | python3 -c 'import sys,json;print(\"seçili:\",[a[\"ad\"] for a in json.load(sys.stdin)[\"alerjenler\"] if a[\"secili\"]])'; curl -s -b $C '$API/menuler/gunluk?yemekhane_id=1&ogun_id=2&tarih=$YARIN' | python3 -c 'import sys,json;m=json.load(sys.stdin)[\"menu\"];print(\"uyarılı yemek sayısı:\",m[\"uyarili_yemek_sayisi\"]);[print(\" \",y[\"ad\"],\"→\",y[\"uyari\"] or \"-\") for k in m[\"kategoriler\"] for y in k[\"yemekler\"]]'"
+sleep 2   # replikasyon eşzamansızdır; yazmadan hemen sonra replikada henüz görünmeyebilir
 calistir "6f. Replikada kullanıcının alerjenleri" "$RE -e 'SELECT * FROM kullanici_alerjenleri WHERE kullanici_id = 7'"
 # Gösterim için rezervasyonu geri al (bakiye iade edilir)
 RID=$($PR -N -e "SELECT id FROM rezervasyonlar WHERE kullanici_id=7 AND menu_id=$MENU" 2>/dev/null)

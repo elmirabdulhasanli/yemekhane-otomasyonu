@@ -1,0 +1,39 @@
+$ cd uygulama && npm test   (birim testleri, veritabanı gerekmez)
+ok 1 - yarimFiyatSec: öğle/akşamda rolüne göre, kahvaltıda null
+ok 2 - porsiyonCoz: boş → tam, yalnızca tam/yarim
+ok 3 - alerjenUyarisiEkle: yalnızca kullanıcının alerjenleri, menü değişmez
+ok 4 - menuyuGrupla: yarım porsiyon alanları önbelleğe giren nesnede
+ok 5 - önbellek yapı sürümü 2 (Aşama 4 ile değişti; eski kayıtlar okunmaz)
+ok 6 - fiyatSec: öğrenci öğrenci fiyatı, personel ve yönetici personel fiyatı öder
+ok 7 - rezervasyonDugmesi: son saat, kapasite ve mevcut rezervasyon
+ok 8 - iptalEdilebilir: yalnızca süresi dolmamış aktif rezervasyon
+ok 9 - menuyuGrupla: kategori sırası, toplam kalori, vejetaryen, alerjenler
+ok 10 - tarihGecerli ve tarihEkle
+ok 11 - tutarCoz: biçim denetimi, virgül kabul edilir, aralık yordamın işi
+ok 12 - degerlendirmeDogrula: 1–5 tam sayı, yorum en fazla 500
+ok 13 - menuFormuDogrula: zorunlu alanlar, fiyat ve yemek listesi
+ok 14 - mysqlHatasiniCevir: 1644 mesajı aynen, 3819 kullanıcıya gösterilmez
+ok 15 - anahtar biçimi: menu:{yemekhane_id}:{tarih}:{ogun_id}
+ok 16 - süre: menünün gününün sonu; geçmiş menüde bugünün sonu
+# tests 16
+# pass 16
+# fail 0
+
+$ node --test testler/e2e.mjs   (çalışan sisteme karşı uçtan uca)
+ok 1 - giriş: hatalı şifre 401 ve Türkçe mesaj
+ok 2 - oturumsuz istek 401
+ok 3 - giriş (bcrypt) ve /ben
+ok 4 - günün menüsü: yemekler, toplam kalori, öğrenci fiyatı
+ok 5 - haftalık: 7 gün, rol fiyatı, geçmiş öğün pasif
+ok 6 - rezervasyon → bakiye kaynaktan; tekrar → yordam mesajı; iptal → iade
+ok 7 - yordam hata mesajları arayüze aynen iletilir
+ok 8 - bakiye yükleme ve hareket geçmişi
+ok 9 - değerlendirme: kullanılmamış menü reddedilir, kullanılmış menü bir kez puanlanır
+ok 10 - yönetici paneli: yetki, menü oluşturma, çakışma, düzenleme, rapor
+ok 11 - Aşama 4 · yarım porsiyon: öğlede %60 ücret, kahvaltıda reddedilir
+ok 12 - Aşama 4 · personel yarım porsiyonu personel fiyatının %60ı
+ok 13 - Aşama 4 · alerjen profili ve menüde uyarı
+ok 14 - çıkış oturumu kapatır
+# tests 14
+# pass 14
+# fail 0

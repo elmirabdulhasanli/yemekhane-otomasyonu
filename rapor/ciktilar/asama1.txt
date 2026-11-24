@@ -2,11 +2,12 @@
 ### 1. Tüm servisler healthy, replica-setup Exited (0)
 $ docker compose ps -a --format 'table {{.Service}}\t{{.Status}}'
 SERVICE         STATUS
-frontend        Up About a minute (healthy)
-mysql-primary   Up About a minute (healthy)
-mysql-replica   Up About a minute (healthy)
-redis           Up About a minute (healthy)
-replica-setup   Exited (0) About a minute ago
+frontend        Up 23 seconds (healthy)
+mysql-primary   Up 23 seconds (healthy)
+mysql-replica   Up 22 seconds (healthy)
+redis           Up 22 seconds (healthy)
+replica-setup   Exited (0) 11 seconds ago
+uygulama        Up 11 seconds (healthy)
 
 ### 1b. replica-setup günlüğü
 $ docker compose logs --no-log-prefix replica-setup
