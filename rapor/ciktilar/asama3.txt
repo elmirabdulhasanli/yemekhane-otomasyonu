@@ -1,0 +1,80 @@
+
+### 0. Temiz başlangıç: bu menünün önbellek kaydı silinir
+$ docker compose exec -T redis redis-cli DEL menu:1:2026-11-25:2
+1
+
+### 1a. İlk istek (yarın öğle, Merkez) → X-Menu-Kaynak: veritabani
+$ curl -s -D - -o /dev/null -b /tmp/tmp.pe2h7zvbpt 'http://localhost:8080/api/menuler/gunluk?yemekhane_id=1&ogun_id=2&tarih=2026-11-25' | grep -i x-menu-kaynak
+X-Menu-Kaynak: veritabani
+
+### 1b. İkinci istek → X-Menu-Kaynak: redis
+$ curl -s -D - -o /dev/null -b /tmp/tmp.pe2h7zvbpt 'http://localhost:8080/api/menuler/gunluk?yemekhane_id=1&ogun_id=2&tarih=2026-11-25' | grep -i x-menu-kaynak
+X-Menu-Kaynak: redis
+
+### 1c. Uygulama günlüğü
+$ docker compose logs --no-log-prefix uygulama | grep '\[menu\] menu:1:2026-11-25:2' | tail -2
+2026-11-24T15:21:31.194Z BILGI [menu] menu:1:2026-11-25:2 kaynak=veritabani(replika)
+2026-11-24T15:21:31.213Z BILGI [menu] menu:1:2026-11-25:2 kaynak=redis
+
+### 1d. Redis'teki kayıt ve kalan süre (saniye, günün sonuna kadar)
+$ docker compose exec -T redis redis-cli --scan --pattern 'menu:*' | sort | head; echo '--- TTL'; docker compose exec -T redis redis-cli TTL menu:1:2026-11-25:2; echo '--- EXPIRETIME (unix)'; docker compose exec -T redis redis-cli EXPIRETIME menu:1:2026-11-25:2; echo '--- GET (ilk 300 karakter)'; docker compose exec -T redis redis-cli GET menu:1:2026-11-25:2 | cut -c1-300
+menu:1:2026-11-23:2
+menu:1:2026-11-25:2
+menu:1:2026-11-26:3
+menu:1:2026-11-27:2
+menu:2:2027-03-14:2
+menu:2:2027-05-23:2
+menu:2:2027-05-27:2
+menu:2:2027-06-19:2
+menu:2:2028-04-05:2
+--- TTL
+106707
+--- EXPIRETIME (unix)
+1795640399
+--- GET (ilk 300 karakter)
+{"surum":1,"menu":{"menu_id":50,"tarih":"2026-11-25","yemekhane_id":1,"yemekhane":"Merkez Yemekhane","ogun_id":2,"ogun":"Öğle","rezervasyon_son":"2026-11-25 10:00:00","ogrenci_fiyati":40,"personel_fiyati":90,"toplam_kalori":1300,"vejetaryen":false,"kategoriler":[{"id":1,"ad":"Çorba","sira":1,"yem
+
+### 2a. Yönetici menüyü değiştirir (menü 50, bir yemek ekler/çıkarır)
+$ curl -s -b /tmp/tmp.BwsUcaGtJe -X PUT -H 'Content-Type: application/json' -d '{"id": 50, "yemekhane_id": 1, "tarih": "2026-11-25", "ogun_id": 2, "ogrenci_fiyati": 40, "personel_fiyati": 90, "yemek_idler": [6, 11, 25, 29, 48, 41]}' http://localhost:8080/api/yonetim/menuler/50; echo
+{"id":50,"eski":{"id":50,"yemekhane_id":1,"tarih":"2026-11-25","ogun_id":2,"ogrenci_fiyati":40,"personel_fiyati":90,"yemek_idler":[6,11,25,29,48]},"yeni":{"yemekhane_id":1,"ogun_id":2,"tarih":"2026-11-25","ogrenci_fiyati":40,"personel_fiyati":90,"yemek_idler":[6,11,25,29,48,41]}}
+
+### 2b. Eski kayıt silindi (EXISTS 0)
+$ docker compose exec -T redis redis-cli EXISTS menu:1:2026-11-25:2
+0
+
+### 2c. Uygulama günlüğü: geçersiz kılma
+$ docker compose logs --no-log-prefix uygulama | grep 'geçersiz kılındı' | tail -1
+2026-11-24T15:21:32.138Z BILGI [onbellek] geçersiz kılındı menu:1:2026-11-25:2 {"silinen":1}
+
+### 2d. Sonraki istek veritabanından, yeni menüyle
+$ curl -s -D /dev/stderr -b /tmp/tmp.pe2h7zvbpt 'http://localhost:8080/api/menuler/gunluk?yemekhane_id=1&ogun_id=2&tarih=2026-11-25' 2>&1 >/dev/null | grep -i x-menu-kaynak; curl -s -b /tmp/tmp.pe2h7zvbpt 'http://localhost:8080/api/menuler/gunluk?yemekhane_id=1&ogun_id=2&tarih=2026-11-25' | python3 -c 'import sys,json;m=json.load(sys.stdin)["menu"];print([y["ad"] for k in m["kategoriler"] for y in k["yemekler"]])'
+X-Menu-Kaynak: veritabani
+['Sebze Çorbası', 'Izgara Köfte', 'Fırın Makarna', 'Çoban Salata', 'Mevsim Meyvesi', 'Menemen']
+
+### 3a. Oturum anahtarı ve süresi (1800 sn, her istekte yenilenir)
+$ docker compose exec -T redis redis-cli --scan --pattern 'oturum:*' | grep -c . | sed 's/^/toplam oturum: /'; docker compose exec -T redis redis-cli TTL oturum:84d932356a5bd952037e1a4146f9e4ca178b50d33282bd76b3407967775fdd78; docker compose exec -T redis redis-cli GET oturum:84d932356a5bd952037e1a4146f9e4ca178b50d33282bd76b3407967775fdd78
+toplam oturum: 21
+1800
+{"kullaniciId":7,"ad":"Mehmet","soyad":"Yıldız","rol":"ogrenci","eposta":"mehmet.yildiz@ogr.kampus.edu.tr","olusturma":1795533691067}
+
+### 3b. 3 sn sonra TTL azaldı, istek atınca tekrar 1800 oldu
+$ docker compose exec -T redis redis-cli TTL oturum:84d932356a5bd952037e1a4146f9e4ca178b50d33282bd76b3407967775fdd78; curl -s -o /dev/null -w 'GET /api/ben → %{http_code}\n' -b /tmp/tmp.pe2h7zvbpt http://localhost:8080/api/ben; docker compose exec -T redis redis-cli TTL oturum:84d932356a5bd952037e1a4146f9e4ca178b50d33282bd76b3407967775fdd78
+1796
+GET /api/ben → 200
+1800
+
+### 3c. Uygulama container'ı yeniden başlatılır
+$ docker compose restart uygulama
+ Container yemekhane-uygulama-1 Restarting 
+ Container yemekhane-uygulama-1 Started 
+
+### 3d. Aynı çerezle istek: oturum düşmedi (HTTP 200)
+$ curl -s -w '\nHTTP %{http_code}\n' -b /tmp/tmp.pe2h7zvbpt http://localhost:8080/api/ben
+{"kullanici":{"id":7,"ad":"Mehmet","soyad":"Yıldız","eposta":"mehmet.yildiz@ogr.kampus.edu.tr","rol":"ogrenci","ogrenci_no":"251229002","bakiye":859}}
+HTTP 200
+
+### 3e. Çıkış → Redis'teki oturum silinir
+$ curl -s -b /tmp/tmp.pe2h7zvbpt -X POST http://localhost:8080/api/oturum/cikis; echo; docker compose exec -T redis redis-cli EXISTS oturum:84d932356a5bd952037e1a4146f9e4ca178b50d33282bd76b3407967775fdd78; curl -s -o /dev/null -w 'eski çerezle /api/ben → HTTP %{http_code}\n' -b /tmp/tmp.pe2h7zvbpt http://localhost:8080/api/ben
+{"tamam":true}
+0
+eski çerezle /api/ben → HTTP 401

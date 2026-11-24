@@ -4,16 +4,28 @@ const menuVeri = require('../veri/menuVeri');
 const kurallar = require('../kurallar');
 const zaman = require('../zaman');
 const { IsHatasi } = require('../hatalar');
+const menuOnbellek = require('../onbellek/menuOnbellek');
+const gunlukYaz = require('../gunluk');
 
 async function referans() {
   const [yemekhaneler, ogunler] = await Promise.all([menuVeri.yemekhaneler(db.okuma), menuVeri.ogunler(db.okuma)]);
   return { yemekhaneler, ogunler, bugun: zaman.bugun() };
 }
 
-// Kullanıcıdan bağımsız menü içeriği (yemekler, kalori, alerjenler, fiyatlar).
+// Kullanıcıdan bağımsız menü içeriği (yemekler, kalori, alerjenler, fiyatlar) → Redis'te önbelleklenir.
+// Dönüş: { menu, kaynak: 'redis' | 'veritabani' }
 async function menuIcerigi(yemekhaneId, tarih, ogunId) {
+  const k = menuOnbellek.anahtar(yemekhaneId, tarih, ogunId);
+  const onbellekte = await menuOnbellek.getir(k);
+  if (onbellekte !== undefined) {
+    gunlukYaz.bilgi('menu', `${k} kaynak=redis`);
+    return { menu: onbellekte, kaynak: 'redis' };
+  }
   const satirlar = await menuVeri.menuDetay(db.okuma, yemekhaneId, tarih, ogunId);
-  return kurallar.menuyuGrupla(satirlar);
+  const menu = kurallar.menuyuGrupla(satirlar);
+  gunlukYaz.bilgi('menu', `${k} kaynak=veritabani(${db.okuma.ad})`);
+  if (menu) await menuOnbellek.yaz(k, menu, tarih, zaman.bugun()); // menü yoksa önbelleğe yazılmaz
+  return { menu, kaynak: 'veritabani' };
 }
 
 async function gunluk(oturum, sorgu) {
@@ -22,13 +34,14 @@ async function gunluk(oturum, sorgu) {
   const tarih = sorgu.tarih || zaman.bugun();
   if (!kurallar.tarihGecerli(tarih)) throw new IsHatasi('Geçersiz tarih.');
 
-  const menu = await menuIcerigi(yemekhaneId, tarih, ogunId);
-  if (!menu) return { menu: null, tarih };
+  const { menu, kaynak } = await menuIcerigi(yemekhaneId, tarih, ogunId);
+  if (!menu) return { menu: null, tarih, kaynak };
 
   // Kullanıcıya özel ve anlık kısımlar önbelleğe alınmaz
   const durum = await menuVeri.menuDurumu(db.okuyucu(oturum), menu.menu_id, oturum.kullaniciId);
   return {
     tarih,
+    kaynak,
     menu: {
       ...menu,
       fiyat: kurallar.fiyatSec(oturum.rol, menu),

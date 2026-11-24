@@ -64,8 +64,22 @@ async function yordamCagir(ad, parametreler) {
   }
 }
 
+// Kaynakta yapılan son yazmanın replikaya geçmesini bekler (GTID). Önbellek silinmeden önce
+// çağrılır; yoksa silinen kaydı bir sonraki okuma replikadaki ESKİ veriyle yeniden doldurabilir.
+// Dönüş: true → replika yakaladı, false → süre doldu (yine de devam edilir).
+async function replikaYakalasin(sureSn = 2) {
+  try {
+    const [[{ gtid }]] = await yazma.query('SELECT @@GLOBAL.gtid_executed AS gtid');
+    const [[{ sonuc }]] = await okumaHam.query('SELECT WAIT_FOR_EXECUTED_GTID_SET(?, ?) AS sonuc', [gtid, sureSn]);
+    return Number(sonuc) === 0;
+  } catch (hata) {
+    gunluk.uyari('db', 'replika bekleme yapılamadı', { mesaj: hata.message });
+    return false;
+  }
+}
+
 async function kapat() {
   await Promise.allSettled([yazma.end(), okumaHam.end()]);
 }
 
-module.exports = { yazma, okuma, okuyucu, yordamCagir, kapat };
+module.exports = { yazma, okuma, okuyucu, yordamCagir, replikaYakalasin, kapat };

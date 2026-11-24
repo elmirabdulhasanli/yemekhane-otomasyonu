@@ -6,6 +6,15 @@ const kurallar = require('../kurallar');
 const zaman = require('../zaman');
 const { IsHatasi } = require('../hatalar');
 const gunluk = require('../gunluk');
+const menuOnbellek = require('../onbellek/menuOnbellek');
+
+// Menü değişti → önce replikanın yeni hali almasını bekle, sonra önbellekteki kaydı sil.
+// Sıra önemli: önce silip sonra beklesek, aradaki bir okuma replikadaki eski menüyü yeniden önbelleğe yazabilirdi.
+async function onbellegiTemizle(...menuler) {
+  const yakaladi = await db.replikaYakalasin();
+  if (!yakaladi) gunluk.uyari('yonetim', 'replika 2 sn içinde yakalayamadı, önbellek yine de siliniyor');
+  await menuOnbellek.sil(menuler.map((m) => menuOnbellek.anahtar(m.yemekhane_id, m.tarih, m.ogun_id)));
+}
 
 function yemekler() {
   return yonetimVeri.yemekler(db.okuma);
@@ -36,6 +45,7 @@ async function olustur(oturum, govde) {
   await yemekleriDenetle(menu.yemek_idler);
   const id = await yonetimVeri.menuOlustur(menu);
   await oturumServis.yazmaYapildi(oturum);
+  await onbellegiTemizle(menu);
   gunluk.bilgi('yonetim', 'menü oluşturuldu', { menu: id, yonetici: oturum.kullaniciId });
   return { id };
 }
@@ -52,6 +62,7 @@ async function guncelle(oturum, idHam, govde) {
   }
   await yonetimVeri.menuGuncelle(id, yeni);
   await oturumServis.yazmaYapildi(oturum);
+  await onbellegiTemizle(eski, yeni); // taşındıysa eski ve yeni anahtar, değilse aynı anahtar bir kez
   gunluk.bilgi('yonetim', 'menü güncellendi', { menu: id, yonetici: oturum.kullaniciId });
   return { id, eski, yeni };
 }

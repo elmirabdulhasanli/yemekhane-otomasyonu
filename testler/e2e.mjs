@@ -161,15 +161,34 @@ test('değerlendirme: kullanılmamış menü reddedilir, kullanılmış menü bi
 
 test('yönetici paneli: yetki, menü oluşturma, çakışma, düzenleme, rapor', async () => {
   assert.equal((await ogrenci.istek('/yonetim/menuler')).durum, 403);
-  const tarih = gunEkle(bugun, 40 + Math.floor(Math.random() * 300));
+  // Menüsü olmayan rastgele bir gelecek tarih bul (önceki çalıştırmalarla çakışmasın)
+  let tarih;
+  for (let i = 0; i < 30 && !tarih; i++) {
+    const aday = gunEkle(bugun, 40 + Math.floor(Math.random() * 600));
+    const v = await yonetici.istek(`/yonetim/menuler?baslangic=${aday}&bitis=${aday}&yemekhane_id=2`);
+    if (!v.veri.menuler.some((m) => m.ogun_id === 2)) tarih = aday;
+  }
+  assert.ok(tarih, 'boş tarih bulunamadı');
   const govde = { yemekhane_id: 2, ogun_id: 2, tarih, ogrenci_fiyati: 41.5, personel_fiyati: 91, yemek_idler: [1, 10, 25] };
   const r = await yonetici.istek('/yonetim/menuler', { method: 'POST', govde });
   assert.equal(r.durum, 201, JSON.stringify(r.veri));
   const cakisma = await yonetici.istek('/yonetim/menuler', { method: 'POST', govde });
   assert.equal(cakisma.durum, 409);
+
+  // Aşama 3: ilk istek veritabanından, ikincisi Redis'ten
+  const yol = `/menuler/gunluk?yemekhane_id=2&ogun_id=2&tarih=${tarih}`;
+  const ilk = await ogrenci.istek(yol);
+  assert.equal(ilk.basliklar.get('x-menu-kaynak'), 'veritabani');
+  const ikinci = await ogrenci.istek(yol);
+  assert.equal(ikinci.basliklar.get('x-menu-kaynak'), 'redis');
+  assert.deepEqual(ikinci.veri.menu.kategoriler, ilk.veri.menu.kategoriler);
+
   const g = await yonetici.istek(`/yonetim/menuler/${r.veri.id}`, { method: 'PUT', govde: { ...govde, yemek_idler: [2, 11], ogrenci_fiyati: 42 } });
   assert.equal(g.durum, 200, JSON.stringify(g.veri));
-  const menu = await menuBul(ogrenci, tarih, 2, 2);
+  // Güncellemeden sonra eski kayıt silinmiş olmalı: istek yine veritabanına gider ve YENİ menüyü görür
+  const sonra = await ogrenci.istek(yol);
+  assert.equal(sonra.basliklar.get('x-menu-kaynak'), 'veritabani');
+  const menu = sonra.veri.menu;
   assert.deepEqual(menu.kategoriler.flatMap((k) => k.yemekler.map((y) => y.id)).sort((a, b) => a - b), [2, 11]);
   assert.equal(menu.fiyat, 42);
   const rapor = await yonetici.istek(`/yonetim/menuler?baslangic=${tarih}&bitis=${tarih}&yemekhane_id=2`);
