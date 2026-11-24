@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rezervasyonlarım · Yemekhane Otomasyonu</title>
+  <link rel="stylesheet" href="/css/temel.css">
+  <link rel="stylesheet" href="/css/uygulama.css">
+</head>
+<body>
+  <main class="kapsayici">
+    <div class="sayfa-baslik">
+      <h1>Rezervasyonlarım</h1>
+      <p>Son saat geçmemiş aktif rezervasyonlar iptal edilebilir; ücret bakiyenize iade edilir.</p>
+    </div>
+    <div class="sekmeler" role="tablist" id="sekmeler">
+      <button role="tab" data-durum="" aria-selected="true">Tümü</button>
+      <button role="tab" data-durum="aktif" aria-selected="false">Aktif</button>
+      <button role="tab" data-durum="kullanildi" aria-selected="false">Kullanıldı</button>
+      <button role="tab" data-durum="iptal" aria-selected="false">İptal</button>
+    </div>
+    <p id="bildirim" class="bildirim" hidden></p>
+    <ul id="icerik" class="liste" aria-live="polite"><li class="yukleniyor">Yükleniyor…</li></ul>
+  </main>
+  <script type="module" src="/js/rezervasyonlar.js"></script>
+</body>
+</html>

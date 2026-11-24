@@ -1,0 +1,189 @@
+// Uçtan uca testler: çalışan sisteme (http://localhost:8080) gerçek HTTP istekleri atar.
+// Çalıştırma (depo kökünde, sistem ayaktayken):  node testler/e2e.mjs
+// Not: örnek veriyi değiştirir (rezervasyon, yükleme, test menüsü). Sıfırlamak için: docker compose down -v
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+const TABAN = process.env.TABAN || 'http://localhost:8080';
+const SIFRE = 'Yemek2026!';
+
+class Istemci {
+  constructor() { this.cerez = ''; }
+  async istek(yol, { method = 'GET', govde } = {}) {
+    const y = await fetch(TABAN + '/api' + yol, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(this.cerez ? { Cookie: this.cerez } : {}) },
+      body: govde === undefined ? undefined : JSON.stringify(govde),
+    });
+    const sc = y.headers.get('set-cookie');
+    if (sc) this.cerez = sc.split(';')[0];
+    let veri = null;
+    try { veri = await y.json(); } catch { /* boş */ }
+    return { durum: y.status, veri, basliklar: y.headers };
+  }
+  async giris(eposta) {
+    const r = await this.istek('/oturum/giris', { method: 'POST', govde: { eposta, sifre: SIFRE } });
+    assert.equal(r.durum, 200, JSON.stringify(r.veri));
+    return r.veri.kullanici;
+  }
+}
+
+const gunEkle = (t, n) => { const d = new Date(t + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+const ogrenci = new Istemci();
+const fakir = new Istemci();
+const yonetici = new Istemci();
+let bugun;
+
+test('giriş: hatalı şifre 401 ve Türkçe mesaj', async () => {
+  const r = await new Istemci().istek('/oturum/giris', { method: 'POST', govde: { eposta: 'mehmet.yildiz@ogr.kampus.edu.tr', sifre: 'yanlis' } });
+  assert.equal(r.durum, 401);
+  assert.equal(r.veri.hata, 'E-posta ya da şifre hatalı.');
+});
+
+test('oturumsuz istek 401', async () => {
+  const r = await new Istemci().istek('/ben');
+  assert.equal(r.durum, 401);
+});
+
+test('giriş (bcrypt) ve /ben', async () => {
+  const k = await ogrenci.giris('Mehmet.Yildiz@ogr.kampus.edu.tr '); // büyük harf / boşluk tolere edilir
+  assert.equal(k.rol, 'ogrenci');
+  await fakir.giris('ayse.demir@ogr.kampus.edu.tr');
+  await yonetici.giris('leyla.arslan@kampus.edu.tr');
+  const r = await ogrenci.istek('/referans');
+  bugun = r.veri.bugun;
+  assert.equal(r.veri.ogunler.length, 3);
+});
+
+test('günün menüsü: yemekler, toplam kalori, öğrenci fiyatı', async () => {
+  const r = await ogrenci.istek(`/menuler/gunluk?yemekhane_id=1&ogun_id=2&tarih=${gunEkle(bugun, 1)}`);
+  assert.equal(r.durum, 200);
+  const m = r.veri.menu;
+  const toplam = m.kategoriler.flatMap((k) => k.yemekler).reduce((t, y) => t + y.kalori, 0);
+  assert.equal(m.toplam_kalori, toplam);
+  assert.equal(m.fiyat, m.ogrenci_fiyati);
+  const sira = m.kategoriler.map((k) => k.sira);
+  assert.deepEqual(sira, [...sira].sort((a, b) => a - b));
+});
+
+test('haftalık: 7 gün, rol fiyatı, geçmiş öğün pasif', async () => {
+  const r = await yonetici.istek(`/menuler/haftalik?yemekhane_id=2&baslangic=${gunEkle(bugun, -1)}`);
+  assert.equal(r.veri.gunler.length, 7);
+  const dun = r.veri.gunler[0].menuler;
+  assert.ok(dun.length > 0);
+  for (const m of dun) assert.equal(m.dugme.aktif, false);
+  const yarin = r.veri.gunler[2].menuler[0];
+  assert.ok(yarin.fiyat >= 50, 'yönetici personel fiyatı öder');
+});
+
+async function menuBul(istemci, tarih, ogunId, yemekhaneId = 1) {
+  const r = await istemci.istek(`/menuler/gunluk?yemekhane_id=${yemekhaneId}&ogun_id=${ogunId}&tarih=${tarih}`);
+  return r.veri.menu;
+}
+
+test('rezervasyon → bakiye kaynaktan; tekrar → yordam mesajı; iptal → iade', async () => {
+  const menu = await menuBul(ogrenci, gunEkle(bugun, 2), 3);
+  const once = (await ogrenci.istek('/ben')).veri.kullanici.bakiye;
+  if (menu.rezervasyon_durum === 'aktif') {
+    await ogrenci.istek(`/rezervasyonlar/${menu.rezervasyon_id}/iptal`, { method: 'POST' });
+  }
+  const baslangic = (await ogrenci.istek('/ben')).veri.kullanici.bakiye;
+  const r = await ogrenci.istek('/rezervasyonlar', { method: 'POST', govde: { menu_id: menu.menu_id } });
+  assert.equal(r.durum, 201, JSON.stringify(r.veri));
+  assert.equal(r.veri.bakiye, +(baslangic - r.veri.ucret).toFixed(2));
+  // Hemen ardından okunan bakiye de güncel olmalı (okuma kaynağa yönlenir)
+  const b = await ogrenci.istek('/bakiye');
+  assert.equal(b.veri.bakiye, r.veri.bakiye);
+  assert.equal(b.veri.kaynak, 'kaynak');
+
+  const tekrar = await ogrenci.istek('/rezervasyonlar', { method: 'POST', govde: { menu_id: menu.menu_id } });
+  assert.equal(tekrar.durum, 400);
+  assert.equal(tekrar.veri.hata, 'Bu menü için zaten rezervasyonunuz var.');
+
+  const liste = (await ogrenci.istek('/rezervasyonlar')).veri.rezervasyonlar;
+  const kayit = liste.find((x) => x.id === r.veri.rezervasyon_id);
+  assert.equal(kayit.durum, 'aktif');
+  assert.equal(kayit.iptal_edilebilir, true);
+
+  const iptal = await ogrenci.istek(`/rezervasyonlar/${r.veri.rezervasyon_id}/iptal`, { method: 'POST' });
+  assert.equal(iptal.durum, 200);
+  assert.equal(iptal.veri.iade, r.veri.ucret);
+  assert.equal(iptal.veri.bakiye, baslangic);
+  assert.ok(once >= 0);
+});
+
+test('yordam hata mesajları arayüze aynen iletilir', async () => {
+  const yarin = await menuBul(fakir, gunEkle(bugun, 1), 2);
+  const r1 = await fakir.istek('/rezervasyonlar', { method: 'POST', govde: { menu_id: yarin.menu_id } });
+  assert.equal(r1.veri.hata, 'Bakiye yetersiz.');
+
+  const dun = await menuBul(ogrenci, gunEkle(bugun, -1), 2);
+  const r2 = await ogrenci.istek('/rezervasyonlar', { method: 'POST', govde: { menu_id: dun.menu_id } });
+  assert.equal(r2.veri.hata, 'Bu menü için rezervasyon süresi doldu.');
+
+  const r3 = await ogrenci.istek('/bakiye/yukle', { method: 'POST', govde: { tutar: 5 } });
+  assert.equal(r3.veri.hata, 'Yükleme tutarı 10 ile 1000 TL arasında olmalıdır.');
+
+  const r4 = await ogrenci.istek('/rezervasyonlar/999999/iptal', { method: 'POST' });
+  assert.equal(r4.veri.hata, 'Rezervasyon bulunamadı.');
+
+  const r5 = await ogrenci.istek('/rezervasyonlar', { method: 'POST', govde: { menu_id: 999999 } });
+  assert.equal(r5.veri.hata, 'Menü bulunamadı.');
+});
+
+test('bakiye yükleme ve hareket geçmişi', async () => {
+  const once = (await ogrenci.istek('/bakiye')).veri;
+  const r = await ogrenci.istek('/bakiye/yukle', { method: 'POST', govde: { tutar: '25,50' } });
+  assert.equal(r.durum, 201);
+  assert.equal(r.veri.bakiye, +(once.bakiye + 25.5).toFixed(2));
+  const sonra = (await ogrenci.istek('/bakiye')).veri;
+  assert.equal(sonra.hareketler[0].tur, 'yukleme');
+  assert.equal(sonra.hareketler[0].tutar, 25.5);
+});
+
+test('değerlendirme: kullanılmamış menü reddedilir, kullanılmış menü bir kez puanlanır', async () => {
+  const gelecek = await menuBul(ogrenci, gunEkle(bugun, 3), 2);
+  const red = await ogrenci.istek('/degerlendirmeler', { method: 'POST', govde: { menu_id: gelecek.menu_id, puan: 5 } });
+  assert.equal(red.durum, 403);
+  assert.equal(red.veri.hata, 'Yalnızca kullandığınız menüleri değerlendirebilirsiniz.');
+
+  const { menuler } = (await ogrenci.istek('/degerlendirmeler')).veri;
+  const bekleyen = menuler.find((m) => m.puan == null);
+  if (!bekleyen) return; // örnek veride hepsi puanlanmışsa
+  const gecersiz = await ogrenci.istek('/degerlendirmeler', { method: 'POST', govde: { menu_id: bekleyen.menu_id, puan: 7 } });
+  assert.equal(gecersiz.durum, 400);
+  const ok = await ogrenci.istek('/degerlendirmeler', { method: 'POST', govde: { menu_id: bekleyen.menu_id, puan: 4, yorum: 'e2e test' } });
+  assert.equal(ok.durum, 201);
+  const iki = await ogrenci.istek('/degerlendirmeler', { method: 'POST', govde: { menu_id: bekleyen.menu_id, puan: 2 } });
+  assert.equal(iki.veri.hata, 'Bu menüyü zaten değerlendirdiniz.');
+});
+
+test('yönetici paneli: yetki, menü oluşturma, çakışma, düzenleme, rapor', async () => {
+  assert.equal((await ogrenci.istek('/yonetim/menuler')).durum, 403);
+  const tarih = gunEkle(bugun, 40 + Math.floor(Math.random() * 300));
+  const govde = { yemekhane_id: 2, ogun_id: 2, tarih, ogrenci_fiyati: 41.5, personel_fiyati: 91, yemek_idler: [1, 10, 25] };
+  const r = await yonetici.istek('/yonetim/menuler', { method: 'POST', govde });
+  assert.equal(r.durum, 201, JSON.stringify(r.veri));
+  const cakisma = await yonetici.istek('/yonetim/menuler', { method: 'POST', govde });
+  assert.equal(cakisma.durum, 409);
+  const g = await yonetici.istek(`/yonetim/menuler/${r.veri.id}`, { method: 'PUT', govde: { ...govde, yemek_idler: [2, 11], ogrenci_fiyati: 42 } });
+  assert.equal(g.durum, 200, JSON.stringify(g.veri));
+  const menu = await menuBul(ogrenci, tarih, 2, 2);
+  assert.deepEqual(menu.kategoriler.flatMap((k) => k.yemekler.map((y) => y.id)).sort((a, b) => a - b), [2, 11]);
+  assert.equal(menu.fiyat, 42);
+  const rapor = await yonetici.istek(`/yonetim/menuler?baslangic=${tarih}&bitis=${tarih}&yemekhane_id=2`);
+  assert.equal(rapor.veri.menuler.length, 1);
+  assert.equal(rapor.veri.menuler[0].rezerve, 0);
+  const bos = await yonetici.istek('/yonetim/menuler', { method: 'POST', govde: { ...govde, yemek_idler: [] } });
+  assert.equal(bos.veri.hata, 'Menüye en az bir yemek ekleyin.');
+});
+
+test('çıkış oturumu kapatır', async () => {
+  const k = new Istemci();
+  await k.giris('murat.kaya@kampus.edu.tr');
+  const eskiCerez = k.cerez;
+  assert.equal((await k.istek('/oturum/cikis', { method: 'POST' })).durum, 200);
+  k.cerez = eskiCerez; // tarayıcı çerezi silmese bile sunucu tarafında oturum yok olmalı
+  assert.equal((await k.istek('/ben')).durum, 401);
+});

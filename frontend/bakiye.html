@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bakiye · Yemekhane Otomasyonu</title>
+  <link rel="stylesheet" href="/css/temel.css">
+  <link rel="stylesheet" href="/css/uygulama.css">
+</head>
+<body>
+  <main class="kapsayici">
+    <div class="sayfa-baslik"><h1>Bakiye</h1></div>
+    <p id="bildirim" class="bildirim" hidden></p>
+    <div class="bakiye-ozet">
+      <section class="kart">
+        <h2>Güncel bakiye</h2>
+        <p class="bakiye-buyuk" id="bakiye">…</p>
+        <p class="soluk kucuk" id="bakiye-kaynak"></p>
+      </section>
+      <section class="kart">
+        <h2>Bakiye yükle</h2>
+        <form id="yukle-formu" novalidate>
+          <div class="hizli-tutar">
+            <button type="button" class="dugme dugme-ikincil dugme-kucuk" data-tutar="50">50 ₺</button>
+            <button type="button" class="dugme dugme-ikincil dugme-kucuk" data-tutar="100">100 ₺</button>
+            <button type="button" class="dugme dugme-ikincil dugme-kucuk" data-tutar="200">200 ₺</button>
+            <button type="button" class="dugme dugme-ikincil dugme-kucuk" data-tutar="500">500 ₺</button>
+          </div>
+          <label for="tutar">Tutar (₺)</label>
+          <div class="yukle-satir">
+            <input id="tutar" name="tutar" inputmode="decimal" placeholder="ör. 150" autocomplete="off">
+            <button class="dugme" type="submit">Yükle</button>
+          </div>
+          <p class="alan-ipucu">Tek seferde 10 ile 1000 ₺ arası yüklenebilir.</p>
+        </form>
+      </section>
+    </div>
+    <section class="kart">
+      <h2>Hareket geçmişi</h2>
+      <div class="tablo-kaydir">
+        <table class="tablo tablo-kart">
+          <thead><tr><th>Tarih</th><th>İşlem</th><th>Açıklama</th><th class="sayi">Tutar</th></tr></thead>
+          <tbody id="hareketler"><tr><td colspan="4" class="yukleniyor">Yükleniyor…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/js/bakiye.js"></script>
+</body>
+</html>

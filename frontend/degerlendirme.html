@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Değerlendirme · Yemekhane Otomasyonu</title>
+  <link rel="stylesheet" href="/css/temel.css">
+  <link rel="stylesheet" href="/css/uygulama.css">
+</head>
+<body>
+  <main class="kapsayici">
+    <div class="sayfa-baslik">
+      <h1>Değerlendirme</h1>
+      <p>Yalnızca kullandığınız (turnikeden geçtiğiniz) menüleri 1–5 arası puanlayabilirsiniz.</p>
+    </div>
+    <div class="sekmeler" role="tablist" id="sekmeler">
+      <button role="tab" data-filtre="bekleyen" aria-selected="true">Bekleyen</button>
+      <button role="tab" data-filtre="yapilan" aria-selected="false">Değerlendirdiklerim</button>
+    </div>
+    <p id="bildirim" class="bildirim" hidden></p>
+    <ul id="icerik" class="liste" aria-live="polite"><li class="yukleniyor">Yükleniyor…</li></ul>
+  </main>
+  <script type="module" src="/js/degerlendirme.js"></script>
+</body>
+</html>

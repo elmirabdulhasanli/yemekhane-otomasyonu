@@ -1,0 +1,19 @@
+{
+  "name": "yemekhane-uygulama",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Yemekhane Otomasyonu Web API (Express + MySQL kaynak/replika + Redis)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^5.3.0",
+    "mysql2": "^3.24.6"
+  }
+}

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Haftalık Menü · Yemekhane Otomasyonu</title>
+  <link rel="stylesheet" href="/css/temel.css">
+  <link rel="stylesheet" href="/css/uygulama.css">
+</head>
+<body>
+  <main class="kapsayici">
+    <div class="sayfa-baslik">
+      <h1>Haftalık Menü ve Rezervasyon</h1>
+      <p>Fiyatlar rolünüze göre gösterilir.</p>
+    </div>
+    <div class="filtreler">
+      <div><label for="yemekhane">Yemekhane</label><select id="yemekhane"></select></div>
+    </div>
+    <div class="hafta-gezinti">
+      <button class="dugme dugme-ikincil dugme-kucuk" type="button" id="onceki" aria-label="Önceki hafta">‹ Önceki</button>
+      <strong id="hafta-baslik"></strong>
+      <button class="dugme dugme-ikincil dugme-kucuk" type="button" id="sonraki" aria-label="Sonraki hafta">Sonraki ›</button>
+    </div>
+    <p id="bildirim" class="bildirim" hidden></p>
+    <div id="icerik" class="gunler" aria-live="polite"><p class="yukleniyor">Yükleniyor…</p></div>
+  </main>
+  <script type="module" src="/js/haftalik.js"></script>
+</body>
+</html>
