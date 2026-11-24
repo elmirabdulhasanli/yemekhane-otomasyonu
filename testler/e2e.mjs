@@ -198,6 +198,93 @@ test('yönetici paneli: yetki, menü oluşturma, çakışma, düzenleme, rapor',
   assert.equal(bos.veri.hata, 'Menüye en az bir yemek ekleyin.');
 });
 
+// ---------------- Aşama 4 ----------------
+test('Aşama 4 · yarım porsiyon: öğlede %60 ücret, kahvaltıda reddedilir', async () => {
+  const k = new Istemci();
+  await k.giris('zeynep.sahin@ogr.kampus.edu.tr');
+  await k.istek('/bakiye/yukle', { method: 'POST', govde: { tutar: 200 } });
+  const ogle = await menuBul(k, gunEkle(bugun, 4), 2, 2);
+  assert.equal(ogle.yarim_porsiyon, true);
+  assert.equal(ogle.yarim_fiyat, +(ogle.fiyat * 0.6).toFixed(2));
+  if (ogle.rezervasyon_durum === 'aktif') await k.istek(`/rezervasyonlar/${ogle.rezervasyon_id}/iptal`, { method: 'POST' });
+  const r = await k.istek('/rezervasyonlar', { method: 'POST', govde: { menu_id: ogle.menu_id, porsiyon: 'yarim' } });
+  assert.equal(r.durum, 201, JSON.stringify(r.veri));
+  assert.equal(r.veri.porsiyon, 'yarim');
+  assert.equal(r.veri.ucret, ogle.yarim_fiyat);
+  const liste = (await k.istek('/rezervasyonlar')).veri.rezervasyonlar;
+  assert.equal(liste.find((x) => x.id === r.veri.rezervasyon_id).porsiyon, 'yarim');
+  const h = (await k.istek('/bakiye')).veri.hareketler[0];
+  assert.equal(h.aciklama, 'Rezervasyon (yarım porsiyon)');
+  assert.equal(h.tutar, -ogle.yarim_fiyat);
+  // iptal → yarım ücret iade edilir; tekrar tam porsiyon → kayıt yeniden aktif, tam ücret
+  const iptal = await k.istek(`/rezervasyonlar/${r.veri.rezervasyon_id}/iptal`, { method: 'POST' });
+  assert.equal(iptal.veri.iade, ogle.yarim_fiyat);
+  const tam = await k.istek('/rezervasyonlar', { method: 'POST', govde: { menu_id: ogle.menu_id, porsiyon: 'tam' } });
+  assert.equal(tam.veri.ucret, ogle.fiyat);
+  assert.equal(tam.veri.rezervasyon_id, r.veri.rezervasyon_id);
+  await k.istek(`/rezervasyonlar/${tam.veri.rezervasyon_id}/iptal`, { method: 'POST' });
+
+  const kahvalti = await menuBul(k, gunEkle(bugun, 4), 1, 2);
+  assert.equal(kahvalti.yarim_porsiyon, false);
+  assert.equal(kahvalti.yarim_fiyat, null);
+  const red = await k.istek('/rezervasyonlar', { method: 'POST', govde: { menu_id: kahvalti.menu_id, porsiyon: 'yarim' } });
+  assert.equal(red.veri.hata, 'Bu öğünde yarım porsiyon seçilemez.');
+  const gecersiz = await k.istek('/rezervasyonlar', { method: 'POST', govde: { menu_id: ogle.menu_id, porsiyon: 'ceyrek' } });
+  assert.equal(gecersiz.veri.hata, 'Geçersiz porsiyon seçimi.');
+});
+
+test('Aşama 4 · personel yarım porsiyonu personel fiyatının %60ı', async () => {
+  const k = new Istemci();
+  await k.giris('sevgi.ozdemir@kampus.edu.tr');
+  const m = await menuBul(k, gunEkle(bugun, 5), 3, 1);
+  assert.equal(m.fiyat, m.personel_fiyati);
+  assert.equal(m.yarim_fiyat, +(m.personel_fiyati * 0.6).toFixed(2));
+});
+
+test('Aşama 4 · alerjen profili ve menüde uyarı', async () => {
+  const k = new Istemci();
+  await k.giris('emre.koc@ogr.kampus.edu.tr');
+  const { alerjenler } = (await k.istek('/profil/alerjenler')).veri;
+  assert.equal(alerjenler.length, 14);
+  const sut = alerjenler.find((a) => a.ad === 'Süt');
+  const gluten = alerjenler.find((a) => a.ad === 'Gluten');
+  const kayit = await k.istek('/profil/alerjenler', { method: 'PUT', govde: { alerjen_idler: [sut.id, gluten.id] } });
+  assert.equal(kayit.durum, 200);
+  assert.deepEqual(kayit.veri.alerjenler.filter((a) => a.secili).map((a) => a.ad).sort(), ['Gluten', 'Süt']);
+
+  let bulundu = false;
+  for (let gun = 0; gun < 6 && !bulundu; gun++) {
+    for (const ogun of [1, 2, 3]) {
+      const m = await menuBul(k, gunEkle(bugun, gun), ogun, 1);
+      if (!m) continue;
+      for (const y of m.kategoriler.flatMap((x) => x.yemekler)) {
+        const beklenen = y.alerjenler.filter((a) => a === 'Süt' || a === 'Gluten').sort();
+        assert.deepEqual([...y.uyari].sort(), beklenen, y.ad);
+        if (beklenen.length) bulundu = true;
+      }
+      if (bulundu) {
+        assert.ok(m.uyarili_yemek_sayisi > 0);
+        assert.deepEqual([...m.alerjenlerim].sort(), ['Gluten', 'Süt']);
+        break;
+      }
+    }
+  }
+  assert.ok(bulundu, 'süt/gluten içeren yemek bulunamadı');
+
+  const hafta = (await k.istek(`/menuler/haftalik?yemekhane_id=1&baslangic=${bugun}`)).veri;
+  assert.ok(hafta.gunler.flatMap((g) => g.menuler).some((m) => m.uyarili_yemekler.length > 0));
+
+  // Başka kullanıcı etkilenmez (menü önbelleği kullanıcıdan bağımsız)
+  const diger = new Istemci();
+  await diger.giris('elif.kurt@ogr.kampus.edu.tr');
+  await diger.istek('/profil/alerjenler', { method: 'PUT', govde: { alerjen_idler: [] } });
+  const m2 = await menuBul(diger, bugun, 2, 1);
+  assert.equal(m2.uyarili_yemek_sayisi, 0);
+
+  const kotu = await k.istek('/profil/alerjenler', { method: 'PUT', govde: { alerjen_idler: [99] } });
+  assert.equal(kotu.veri.hata, 'Seçilen alerjenlerden biri bulunamadı.');
+});
+
 test('çıkış oturumu kapatır', async () => {
   const k = new Istemci();
   await k.giris('murat.kaya@kampus.edu.tr');

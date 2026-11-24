@@ -1,5 +1,5 @@
 import { api, sayfaBaslat, tl, tarihYaz, saatYaz, esc, bildir, bildirimGizle, seciliDoldur,
-  adresParam, adresGuncelle, ustBakiyeGuncelle } from './ortak.js';
+  adresParam, adresGuncelle, ustBakiyeGuncelle, porsiyonSecimi, seciliPorsiyon } from './ortak.js';
 
 const $ = (id) => document.getElementById(id);
 const kutu = $('bildirim');
@@ -13,11 +13,13 @@ function dolulukCubugu(m) {
 }
 
 function yemekSatiri(y) {
+  const uyari = y.uyari || [];
   const rozetler = [
+    uyari.length ? `<span class="rozet rozet-uyari">⚠ Alerjeniniz: ${esc(uyari.join(', '))}</span>` : '',
     y.vejetaryen ? '<span class="rozet rozet-veg" title="Vejetaryen">🌿 Vejetaryen</span>' : '',
-    ...y.alerjenler.map((a) => `<span class="rozet rozet-alerjen">${esc(a)}</span>`),
+    ...y.alerjenler.filter((a) => !uyari.includes(a)).map((a) => `<span class="rozet rozet-alerjen">${esc(a)}</span>`),
   ].join('');
-  return `<div class="yemek">
+  return `<div class="yemek${uyari.length ? ' uyarili' : ''}">
       <div><div class="yemek-ad">${esc(y.ad)}</div>${rozetler ? `<div class="yemek-rozetler">${rozetler}</div>` : ''}</div>
       <div class="yemek-kalori">${y.kalori} kcal</div>
     </div>`;
@@ -36,8 +38,10 @@ function menuCiz(m) {
           <span class="rozet">⏰ Son rezervasyon ${saatYaz(m.rezervasyon_son)}</span>
         </div>
       </div>
-      <div class="fiyat">${tl(m.fiyat)} <small>/ kişi</small></div>
+      <div class="fiyat">${tl(m.fiyat)} <small>/ kişi${m.yarim_fiyat != null ? ` · yarım ${tl(m.yarim_fiyat)}` : ''}</small></div>
     </div>
+    ${m.uyarili_yemek_sayisi ? `<p class="bildirim bildirim-hata uyari-bant" role="note">⚠ Bu menüde profilinizde seçtiğiniz alerjenleri
+      (${esc(m.alerjenlerim.join(', '))}) içeren ${m.uyarili_yemek_sayisi} yemek var.</p>` : ''}
     ${kategoriler}
     <div class="menu-alt">
       ${dolulukCubugu(m)}
@@ -47,7 +51,10 @@ function menuCiz(m) {
 }
 
 function eylemCiz(m) {
-  if (m.dugme.aktif) return `<button class="dugme" data-rezerve="${m.menu_id}">Rezervasyon yap</button>`;
+  if (m.dugme.aktif) return `${porsiyonSecimi(m)}<button class="dugme" data-rezerve="${m.menu_id}">Rezervasyon yap</button>`;
+  if (m.rezervasyon_durum === 'aktif' && m.rezervasyon_porsiyon === 'yarim') {
+    return '<button class="dugme" disabled>Rezervasyonunuz var (yarım)</button>';
+  }
   return `<button class="dugme" disabled title="${esc(m.dugme.neden)}">${esc(m.dugme.neden)}</button>`;
 }
 
@@ -72,13 +79,11 @@ icerik.addEventListener('click', async (e) => {
   if (!d) return;
   d.disabled = true;
   try {
-    const govde = { menu_id: Number(d.dataset.rezerve) };
-    const porsiyon = icerik.querySelector('[name="porsiyon"]');
-    if (porsiyon) govde.porsiyon = porsiyon.value;
+    const govde = { menu_id: Number(d.dataset.rezerve), porsiyon: seciliPorsiyon(d.parentElement) };
     const sonuc = await api('/rezervasyonlar', { method: 'POST', govde });
     ustBakiyeGuncelle(sonuc.bakiye);
     await yukle();
-    bildir(kutu, `Rezervasyon yapıldı. Ücret: ${tl(sonuc.ucret)} · Kalan bakiye: ${tl(sonuc.bakiye)}`, 'basari');
+    bildir(kutu, `Rezervasyon yapıldı (${sonuc.porsiyon === 'yarim' ? 'yarım' : 'tam'} porsiyon). Ücret: ${tl(sonuc.ucret)} · Kalan bakiye: ${tl(sonuc.bakiye)}`, 'basari');
   } catch (hata) {
     d.disabled = false;
     bildir(kutu, hata.message);

@@ -37,14 +37,21 @@ async function gunluk(oturum, sorgu) {
   const { menu, kaynak } = await menuIcerigi(yemekhaneId, tarih, ogunId);
   if (!menu) return { menu: null, tarih, kaynak };
 
-  // Kullanıcıya özel ve anlık kısımlar önbelleğe alınmaz
-  const durum = await menuVeri.menuDurumu(db.okuyucu(oturum), menu.menu_id, oturum.kullaniciId);
+  // Kullanıcıya özel ve anlık kısımlar (doluluk, rezervasyon, alerjen uyarısı) önbelleğe alınmaz
+  const okuyucu = db.okuyucu(oturum);
+  const [durum, alerjenler] = await Promise.all([
+    menuVeri.menuDurumu(okuyucu, menu.menu_id, oturum.kullaniciId),
+    menuVeri.kullaniciAlerjenleri(okuyucu, oturum.kullaniciId),
+  ]);
   return {
     tarih,
     kaynak,
     menu: {
-      ...menu,
+      ...kurallar.alerjenUyarisiEkle(menu, alerjenler),
       fiyat: kurallar.fiyatSec(oturum.rol, menu),
+      yarim_fiyat: kurallar.yarimFiyatSec(oturum.rol, menu),
+      rezervasyon_porsiyon: durum.rezervasyon_porsiyon,
+      alerjenlerim: alerjenler.map((a) => a.ad),
       bos_yer: durum.bos_yer,
       kapasite: durum.kapasite,
       rezervasyon_durum: durum.rezervasyon_durum,
@@ -75,6 +82,9 @@ async function haftalik(oturum, sorgu) {
       bos_yer: s.bos_yer,
       rezervasyon_son: s.rezervasyon_son,
       fiyat: kurallar.fiyatSec(oturum.rol, s),
+      yarim_fiyat: kurallar.yarimFiyatSec(oturum.rol, s),
+      uyarili_yemekler: s.uyarili_yemekler ? s.uyarili_yemekler.split(', ') : [],
+      rezervasyon_porsiyon: s.rezervasyon_porsiyon,
       rezervasyon_id: s.rezervasyon_id,
       rezervasyon_durum: s.rezervasyon_durum,
       dugme: kurallar.rezervasyonDugmesi(s),

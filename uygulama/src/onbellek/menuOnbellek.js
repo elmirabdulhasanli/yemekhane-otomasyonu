@@ -5,8 +5,9 @@
 const redis = require('./redis');
 const gunluk = require('../gunluk');
 
-// Önbellekteki JSON'un yapı sürümü. Yapı değişirse artırılır; eski sürümlü kayıt "yok" sayılır.
-const SURUM = 1;
+// Önbellekteki JSON'un yapı sürümü. Yapı değişirse artırılır; eski sürümlü kayıt "yok" sayılır
+// ve silinir. 1 → 2 (Aşama 4): yarim_porsiyon ve yarım porsiyon fiyatları eklendi.
+const SURUM = 2;
 
 const anahtar = (yemekhaneId, tarih, ogunId) => `menu:${yemekhaneId}:${tarih}:${ogunId}`;
 

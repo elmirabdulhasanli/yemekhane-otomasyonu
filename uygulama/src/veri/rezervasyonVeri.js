@@ -1,8 +1,9 @@
 // Veri katmanı · rezervasyonlar. Para hareketi yapan işlemler stored procedure ile yapılır.
 const { yordamCagir } = require('../db/havuzlar');
 
-function rezervasyonYap(kullaniciId, menuId) {
-  return yordamCagir('sp_rezervasyon_yap', [kullaniciId, menuId]);
+// Aşama 4: porsiyon parametresi ('tam' | 'yarim'); ücret ve öğün kontrolü yordamda.
+function rezervasyonYap(kullaniciId, menuId, porsiyon) {
+  return yordamCagir('sp_rezervasyon_yap', [kullaniciId, menuId, porsiyon]);
 }
 
 function rezervasyonIptal(kullaniciId, rezervasyonId) {
@@ -11,7 +12,7 @@ function rezervasyonIptal(kullaniciId, rezervasyonId) {
 
 async function kullanicininRezervasyonlari(db, kullaniciId) {
   const [s] = await db.query(
-    `SELECT r.id, r.menu_id, r.durum, r.ucret, r.olusturma, r.kullanma_zamani, r.iptal_zamani,
+    `SELECT r.id, r.menu_id, r.durum, r.porsiyon, r.ucret, r.olusturma, r.kullanma_zamani, r.iptal_zamani,
             m.tarih, m.yemekhane_id, yh.ad AS yemekhane, m.ogun_id, o.ad AS ogun,
             TIMESTAMP(m.tarih, o.son_saat) AS rezervasyon_son,
             (NOW() >= TIMESTAMP(m.tarih, o.son_saat)) AS suresi_doldu

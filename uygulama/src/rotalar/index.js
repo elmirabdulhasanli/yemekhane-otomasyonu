@@ -7,6 +7,7 @@ const rezervasyon = require('../controllers/rezervasyonController');
 const bakiye = require('../controllers/bakiyeController');
 const degerlendirme = require('../controllers/degerlendirmeController');
 const yonetim = require('../controllers/yonetimController');
+const profil = require('../controllers/profilController');
 
 const r = Router();
 
@@ -30,6 +31,9 @@ r.post('/bakiye/yukle', oturumGerekli, bakiye.yukle);
 
 r.get('/degerlendirmeler', oturumGerekli, degerlendirme.liste);
 r.post('/degerlendirmeler', oturumGerekli, degerlendirme.kaydet);
+
+r.get('/profil/alerjenler', oturumGerekli, profil.alerjenler);
+r.put('/profil/alerjenler', oturumGerekli, profil.alerjenleriKaydet);
 
 const yonetici = [oturumGerekli, rolGerekli('yonetici')];
 r.get('/yonetim/yemekler', ...yonetici, yonetim.yemekler);

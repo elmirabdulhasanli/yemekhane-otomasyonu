@@ -1,5 +1,5 @@
 import { api, sayfaBaslat, tl, tarihYaz, kisaTarih, saatYaz, esc, bildir, bildirimGizle,
-  seciliDoldur, adresParam, adresGuncelle, ustBakiyeGuncelle } from './ortak.js';
+  seciliDoldur, adresParam, adresGuncelle, ustBakiyeGuncelle, porsiyonSecimi, seciliPorsiyon } from './ortak.js';
 
 const $ = (id) => document.getElementById(id);
 const kutu = $('bildirim');
@@ -30,13 +30,12 @@ function ogunCiz(m) {
       <span class="rozet">${m.toplam_kalori} kcal</span>
       <span class="rozet">son ${saatYaz(m.rezervasyon_son)}</span>
       ${DURUM_ROZET[m.rezervasyon_durum] || ''}
+      ${m.rezervasyon_durum === 'aktif' && m.rezervasyon_porsiyon === 'yarim' ? '<span class="rozet rozet-aktif">Yarım porsiyon</span>' : ''}
+      ${m.uyarili_yemekler.length ? `<span class="rozet rozet-uyari" title="Profilinizdeki alerjenler">⚠ ${esc(m.uyarili_yemekler.join(', '))}</span>` : ''}
     </div>
     <div class="ogun-eylem">${eylem}</div>
   </div>`;
 }
-
-// Aşama 4'te porsiyon seçimi eklenir
-function porsiyonSecimi() { return ''; }
 
 function gunCiz(g) {
   const menuler = g.menuler.length ? g.menuler.map(ogunCiz).join('') : '<p class="ogun-satir soluk">Menü girilmemiş.</p>';
@@ -62,15 +61,13 @@ icerik.addEventListener('click', async (e) => {
   const d = e.target.closest('[data-rezerve]');
   if (!d) return;
   d.disabled = true;
-  const govde = { menu_id: Number(d.dataset.rezerve) };
-  const secim = d.parentElement.querySelector('select[name="porsiyon"]');
-  if (secim) govde.porsiyon = secim.value;
+  const govde = { menu_id: Number(d.dataset.rezerve), porsiyon: seciliPorsiyon(d.parentElement) };
   try {
     const sonuc = await api('/rezervasyonlar', { method: 'POST', govde });
     // Bakiye yordamın döndürdüğü değerdir (kaynak); replikadan okunsaydı eski görünebilirdi.
     ustBakiyeGuncelle(sonuc.bakiye);
     await yukle();
-    bildir(kutu, `Rezervasyon yapıldı. Ücret: ${tl(sonuc.ucret)} · Kalan bakiye: ${tl(sonuc.bakiye)}`, 'basari');
+    bildir(kutu, `Rezervasyon yapıldı (${sonuc.porsiyon === 'yarim' ? 'yarım' : 'tam'} porsiyon). Ücret: ${tl(sonuc.ucret)} · Kalan bakiye: ${tl(sonuc.bakiye)}`, 'basari');
   } catch (hata) {
     d.disabled = false;
     bildir(kutu, hata.message);

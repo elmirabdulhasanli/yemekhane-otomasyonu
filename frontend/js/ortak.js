@@ -68,6 +68,7 @@ const BAGLANTILAR = [
   { href: '/rezervasyonlar.html', ad: 'Rezervasyonlarım' },
   { href: '/bakiye.html', ad: 'Bakiye' },
   { href: '/degerlendirme.html', ad: 'Değerlendir' },
+  { href: '/profil.html', ad: 'Profil' },
   { href: '/yonetim.html', ad: 'Yönetim', rol: 'yonetici' },
 ];
 
@@ -113,6 +114,22 @@ export function ustBakiyeGuncelle(bakiye) {
   const el = document.getElementById('ust-bakiye');
   if (el) { el.textContent = tl(bakiye); el.classList.remove('parla'); void el.offsetWidth; el.classList.add('parla'); }
   if (aktifKullanici) aktifKullanici.bakiye = bakiye;
+}
+
+// Aşama 4: tam / yarım porsiyon seçimi (yarım yoksa boş döner, düğme tam porsiyon rezerve eder).
+// Fiyatlar API'den gelir; arayüz hesaplamaz.
+let porsiyonSayac = 0;
+export function porsiyonSecimi(m) {
+  if (m.yarim_fiyat == null) return '';
+  const ad = `porsiyon-${++porsiyonSayac}`;
+  return `<div class="porsiyon-secim" role="radiogroup" aria-label="Porsiyon">
+    <label><input type="radio" name="${ad}" data-porsiyon value="tam" checked><span>Tam ${tl(m.fiyat)}</span></label>
+    <label><input type="radio" name="${ad}" data-porsiyon value="yarim"><span>Yarım ${tl(m.yarim_fiyat)}</span></label>
+  </div>`;
+}
+export function seciliPorsiyon(kapsam) {
+  const s = kapsam.querySelector('[data-porsiyon]:checked');
+  return s ? s.value : 'tam';
 }
 
 export function seciliDoldur(select, liste, secili, { deger = 'id', metin = 'ad' } = {}) {

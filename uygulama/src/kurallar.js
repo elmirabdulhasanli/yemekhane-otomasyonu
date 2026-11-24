@@ -8,6 +8,36 @@ function fiyatSec(rol, menu) {
   return rol === 'ogrenci' ? menu.ogrenci_fiyati : menu.personel_fiyati;
 }
 
+// Aşama 4: rolüne göre yarım porsiyon ücreti; öğünde yarım porsiyon yoksa null.
+// (Ücretin kendisi veritabanındaki fn_porsiyon_ucreti ile hesaplanır, burada yalnızca seçilir.)
+function yarimFiyatSec(rol, menu) {
+  if (Number(menu.yarim_porsiyon) !== 1) return null;
+  return rol === 'ogrenci' ? menu.ogrenci_yarim_fiyati : menu.personel_yarim_fiyati;
+}
+
+const PORSIYONLAR = ['tam', 'yarim'];
+function porsiyonCoz(deger) {
+  const p = deger == null || deger === '' ? 'tam' : String(deger);
+  if (!PORSIYONLAR.includes(p)) throw new IsHatasi('Geçersiz porsiyon seçimi.');
+  return p;
+}
+
+// Aşama 4: menüdeki yemekleri kullanıcının alerjenleriyle karşılaştırır.
+// Her yemeğe "uyari" (eşleşen alerjen adları) ekler; menüyü değiştirmez, yeni nesne döner.
+function alerjenUyarisiEkle(menu, kullaniciAlerjenleri) {
+  const adlar = new Map(kullaniciAlerjenleri.map((a) => [a.id, a.ad]));
+  let uyariliYemek = 0;
+  const kategoriler = menu.kategoriler.map((k) => ({
+    ...k,
+    yemekler: k.yemekler.map((y) => {
+      const uyari = y.alerjen_idler.filter((id) => adlar.has(id)).map((id) => adlar.get(id));
+      if (uyari.length) uyariliYemek++;
+      return { ...y, uyari };
+    }),
+  }));
+  return { ...menu, kategoriler, uyarili_yemek_sayisi: uyariliYemek };
+}
+
 // Haftalık menüdeki "Rezervasyon yap" düğmesinin durumu ve pasifse nedeni.
 function rezervasyonDugmesi({ suresi_doldu, bos_yer, rezervasyon_durum }) {
   if (rezervasyon_durum === 'aktif') return { aktif: false, neden: 'Rezervasyonunuz var' };
@@ -53,6 +83,9 @@ function menuyuGrupla(satirlar) {
     rezervasyon_son: ilk.rezervasyon_son,
     ogrenci_fiyati: ilk.ogrenci_fiyati,
     personel_fiyati: ilk.personel_fiyati,
+    yarim_porsiyon: Number(ilk.yarim_porsiyon) === 1,
+    ogrenci_yarim_fiyati: ilk.ogrenci_yarim_fiyati,
+    personel_yarim_fiyati: ilk.personel_yarim_fiyati,
     toplam_kalori: toplamKalori,
     vejetaryen: tumYemekler.every((y) => y.vejetaryen),
     kategoriler,
@@ -113,6 +146,6 @@ function menuFormuDogrula(g) {
 }
 
 module.exports = {
-  fiyatSec, rezervasyonDugmesi, iptalEdilebilir, menuyuGrupla, tarihGecerli, tarihEkle,
+  fiyatSec, yarimFiyatSec, porsiyonCoz, alerjenUyarisiEkle, rezervasyonDugmesi, iptalEdilebilir, menuyuGrupla, tarihGecerli, tarihEkle,
   pozitifTamsayi, tutarCoz, degerlendirmeDogrula, menuFormuDogrula,
 };
