@@ -52,7 +52,7 @@ code {{ background: #EEF2F0; padding: 0 3pt; border-radius: 2pt; font-size: 9pt;
 
 <section class="kapak">
   <h1>Yemekhane Otomasyonu · Dönem Ödevi Raporu</h1>
-  <p>Web Teknolojileri · Öğrenci: <b>____________________</b> · Numara: <b>__________</b> · Depo: <b>____________________</b></p>
+  <p>Web Teknolojileri · Öğrenci: <b>Elmir Abdulhasanli</b> · Numara: <b>241229097</b><br>Depo: <b>https://github.com/elmirabdulhasanli/yemekhane-otomasyonu</b></p>
   <div class="secim"><b>Seçilen yol: Web API + arayüz.</b> Uygulama Node.js 22 + Express 5 ile yazılmış, yalnızca JSON döndüren bir Web API'dir
   (<code>uygulama/</code>). HTML5 + CSS3 arayüz <code>frontend/</code> klasöründe Apache tarafından sunulur ve veriyi JavaScript <code>fetch</code> ile alır;
   çerçeve (React vb.) kullanılmamıştır. Apache <code>-D WEBAPI</code> modunda <code>/api/</code> isteklerini uygulamaya iletir.</div>

@@ -1,4 +1,6 @@
-# Yemekhane Otomasyonu · Dönem Ödevi (tamamlanmış)
+# Yemekhane Otomasyonu · Dönem Ödevi
+
+**Öğrenci:** Elmir Abdulhasanli · **Numara:** 241229097 · Web Teknolojileri
 
 **Seçilen yol: Web API + arayüz.** `uygulama/` Node.js 22 + Express 5, yalnızca JSON döner (`/api/...`).
 `frontend/` HTML5 + CSS3 + vanilla JavaScript (`fetch`), Apache sunar. Rapor: `rapor/Yemekhane_Otomasyonu_Rapor.pdf`.
